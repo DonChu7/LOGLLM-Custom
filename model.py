@@ -3,6 +3,7 @@ import os.path
 import peft
 import torch
 from transformers import BertTokenizerFast, BertModel, BitsAndBytesConfig, AutoTokenizer, AutoModelForCausalLM, DynamicCache
+from transformers.utils import is_bitsandbytes_available
 import numpy as np
 from torch import nn
 from peft import PeftModel, LoraConfig, prepare_model_for_kbit_training, get_peft_model, TaskType
@@ -76,12 +77,15 @@ def stack_and_pad_left(tensors):
 
     return stacked_tensor, padding_masks
 
-bnb_config = BitsAndBytesConfig(
-    load_in_4bit=True,  # load the model into memory using 4-bit precision
-    bnb_4bit_use_double_quant=False,  # use double quantition
-    bnb_4bit_quant_type="nf4",  # use NormalFloat quantition
-    bnb_4bit_compute_dtype=torch.bfloat16  # use hf for computing when we need
-)
+if is_bitsandbytes_available():
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,  # load the model into memory using 4-bit precision
+        bnb_4bit_use_double_quant=False,  # use double quantition
+        bnb_4bit_quant_type="nf4",  # use NormalFloat quantition
+        bnb_4bit_compute_dtype=torch.bfloat16  # use hf for computing when we need
+    )
+else:
+    bnb_config = None
 
 class LogLLM(nn.Module):
     def __init__(self, Bert_path, Llama_path, ft_path=None, is_train_mode=True, device = torch.device("cuda:0"), max_content_len = 128, max_seq_len = 128):
@@ -91,13 +95,37 @@ class LogLLM(nn.Module):
         self.device = device
         self.Llama_tokenizer = AutoTokenizer.from_pretrained(Llama_path, padding_side="right")
         self.Llama_tokenizer.pad_token = self.Llama_tokenizer.eos_token
-        self.Llama_model = AutoModelForCausalLM.from_pretrained(Llama_path, quantization_config=bnb_config,
-                                                           low_cpu_mem_usage=True,
-                                                           device_map=device)  # embedding dim = 4096
 
+        def _to_device_map(dev):
+            if isinstance(dev, str):
+                return dev
+            if isinstance(dev, torch.device):
+                if dev.type == 'cuda':
+                    idx = dev.index if dev.index is not None else 0
+                    return f"cuda:{idx}"
+                return 'cpu'
+            return dev
+
+        device_map = _to_device_map(device)
+
+        llama_kwargs = dict(low_cpu_mem_usage=True)
+        bert_kwargs = dict(low_cpu_mem_usage=True)
+        if bnb_config is not None:
+            llama_kwargs['quantization_config'] = bnb_config
+            bert_kwargs['quantization_config'] = bnb_config
+            llama_kwargs['device_map'] = device_map
+            bert_kwargs['device_map'] = device_map
+        elif device_map != 'cpu':
+            llama_kwargs['device_map'] = device_map
+            bert_kwargs['device_map'] = device_map
+
+        self.Llama_model = AutoModelForCausalLM.from_pretrained(Llama_path, **llama_kwargs)  # embedding dim = 4096
         self.Bert_tokenizer = BertTokenizerFast.from_pretrained(Bert_path, do_lower_case=True)
-        self.Bert_model = BertModel.from_pretrained(Bert_path, quantization_config=bnb_config, low_cpu_mem_usage=True,
-                                               device_map=device)
+        self.Bert_model = BertModel.from_pretrained(Bert_path, **bert_kwargs)
+
+        if bnb_config is None and device_map != 'cpu':
+            self.Llama_model.to(self.device)
+            self.Bert_model.to(self.device)
 
         self.projector = nn.Linear(self.Bert_model.config.hidden_size, self.Llama_model.config.hidden_size, device=device)
         # self.projector = nn.Linear(self.Bert_model.config.hidden_size, self.Llama_model.config.hidden_size).half().to(device)

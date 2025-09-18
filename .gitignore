@@ -1,0 +1,22 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+
+# Hugging Face / model weights
+Meta-Llama-3-8B/
+*.bin
+*.safetensors
+*.pt
+
+# LogLLM fine-tuned models
+ft_model_*/
+*.pth
+
+# Misc
+.DS_Store
+*.log

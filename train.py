@@ -59,13 +59,13 @@ f'min_less_portion: {min_less_portion}\n'
 f'device: {device}')
 
 def print_number_of_trainable_model_parameters(model):
-    params = set()
+    params = []
     trainable_model_params = 0
     all_model_params = 0
     for _, param in model.named_parameters():
         all_model_params += param.numel()
         if param.requires_grad:
-            params.add(param)
+            params.append(param)
             trainable_model_params += param.numel()
     print(f"all params num: {all_model_params}, trainable param num: {trainable_model_params}")
     return params
