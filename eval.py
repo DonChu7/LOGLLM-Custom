@@ -17,7 +17,7 @@ data_path = str(Path(__file__).parent / 'dataset' / 'test.csv')
 
 ROOT_DIR = Path(__file__).parent
 Bert_path = str(ROOT_DIR / 'bert-base-uncased')
-Llama_path = str(ROOT_DIR / 'Meta-Llama-3-8B')
+Llama_path = str(ROOT_DIR / 'TinyLlama-1.1B')
 ft_path = os.path.join(ROOT_DIR, r"ft_model_{}".format(dataset_name))
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

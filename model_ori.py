@@ -168,7 +168,7 @@ class LogLLM(nn.Module):
                 r=8,
                 lora_alpha=16,
                 lora_dropout=0.1,
-                target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"],
+                target_modules=["q_proj", "v_proj"],
                 bias="none",
                 task_type=TaskType.CAUSAL_LM
             )
@@ -233,16 +233,10 @@ class LogLLM(nn.Module):
         batch_size = len(labels)
 
 
-        # outputs = self.Bert_model(**inputs).pooler_output  # dim = 768
-        # outputs = outputs.float()
-        # outputs = self.projector(outputs)
-        # outputs = outputs.half()
-
-        # get the dtype the decoder expects for its input embeddings
-        embed_dtype = self.Llama_model.get_input_embeddings().weight.dtype
-
-        outputs = self.Bert_model(**inputs).pooler_output          # (N, 768)
-        outputs = self.projector(outputs.to(embed_dtype))          # (N, D), D=decoder hidden
+        outputs = self.Bert_model(**inputs).pooler_output  # dim = 768
+        outputs = outputs.float()
+        outputs = self.projector(outputs)
+        outputs = outputs.half()
 
         seq_embeddings = torch.tensor_split(outputs, seq_positions)
 
@@ -296,17 +290,10 @@ class LogLLM(nn.Module):
         '''
         batch_size = len(seq_positions) + 1
 
-        # outputs = self.Bert_model(**inputs).pooler_output  # dim = 768
-        # outputs = outputs.float()
-        # outputs = self.projector(outputs)
-        # outputs = outputs.half()
-
-        # get the dtype the decoder expects for its input embeddings
-        embed_dtype = self.Llama_model.get_input_embeddings().weight.dtype
-
-        outputs = self.Bert_model(**inputs).pooler_output          # (N, 768)
-        outputs = self.projector(outputs.to(embed_dtype))          # (N, D), D=decoder hidden
-        # no extra cast; projector output is already in the right dtype
+        outputs = self.Bert_model(**inputs).pooler_output  # dim = 768
+        outputs = outputs.float()
+        outputs = self.projector(outputs)
+        outputs = outputs.half()
 
         seq_embeddings = torch.tensor_split(outputs, seq_positions)
 
